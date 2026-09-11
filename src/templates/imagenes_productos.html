@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo MongoDB - Imágenes y Documentos</title>
+    <!-- Bootstrap CSS y Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+      .img-container {
+        height: 220px;
+        width: 100%;
+        background-color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 12px;
+      }
+      .product-img {
+        max-height: 100%;
+        max-width: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+      }
+      .card:hover .product-img {
+        transform: scale(1.08);
+      }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Barra de Navegación Bootstrap -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="/productos">
+      <i class="bi bi-boxes text-warning"></i> Sistema de Mercancía
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link fw-semibold" href="/productos">
+            <i class="bi bi-database text-primary"></i> MySQL (Productos)
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active fw-semibold" href="/mongo">
+            <i class="bi bi-leaf text-success"></i> MongoDB (Catálogo e Imágenes)
+          </a>
+        </li>
+      </ul>
+      <a href="/sincronizar" class="btn btn-outline-info btn-sm">
+        <i class="bi bi-arrow-repeat"></i> Sincronizar Todo
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+    <!-- Encabezado con buscador de MongoDB -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body p-4">
+        <div class="row align-items-center g-3">
+          <div class="col-md-6">
+            <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-leaf-fill text-success"></i> Colección MongoDB (`mercancia.producto`)</h3>
+            <p class="text-muted mb-0 small">Búsqueda directa sobre los documentos almacenados en MongoDB.</p>
+          </div>
+          <div class="col-md-6">
+            <form action="/mongo" method="GET" class="d-flex">
+              <input class="form-control me-2" type="search" name="q" value="{{ busqueda or '' }}" placeholder="Buscar en MongoDB por nombre, descripción o marca..." aria-label="Buscar en Mongo">
+              <button class="btn btn-success" type="submit"><i class="bi bi-search"></i> Buscar en Mongo</button>
+              {% if busqueda %}
+                <a href="/mongo" class="btn btn-outline-secondary ms-1" title="Limpiar"><i class="bi bi-x-lg"></i></a>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista de Tarjetas / Catálogo de MongoDB -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+      {% for i in data2 %}
+      <div class="col">
+        <div class="card h-100 shadow-sm border-0 overflow-hidden">
+          <div class="img-container">
+            <img src="{{ i.url or 'https://via.placeholder.com/300x200?text=Sin+Imagen' }}" class="product-img" alt="{{ i.producto }}" onerror="this.src='https://via.placeholder.com/300x200?text=Imagen+No+Disponible'">
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h5 class="card-title fw-bold text-capitalize mb-0">{{ i.producto }}</h5>
+              {% if i.idproducto %}
+                <span class="badge bg-primary">MySQL ID: #{{ i.idproducto }}</span>
+              {% else %}
+                <span class="badge bg-secondary">Doc Mongo</span>
+              {% endif %}
+            </div>
+            
+            {% if i.marca %}
+              <p class="mb-1 text-muted small"><strong>Marca:</strong> {{ i.marca }}</p>
+            {% endif %}
+            {% if i.precio %}
+              <p class="mb-2 text-success fw-bold"><strong>Precio:</strong> ${{ "{:,.2f}".format(i.precio|float) }}</p>
+            {% endif %}
+
+            <p class="card-text text-secondary small">{{ i.descripcion or 'Sin descripción disponible.' }}</p>
+          </div>
+          <div class="card-footer bg-white border-top-0 pt-0 pb-3">
+            <small class="text-muted d-block text-truncate">
+              <i class="bi bi-link-45deg"></i> <a href="{{ i.url }}" target="_blank" class="text-decoration-none text-muted">{{ i.url }}</a>
+            </small>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12">
+        <div class="card border-0 shadow-sm text-center py-5 text-muted">
+          <div class="card-body">
+            <i class="bi bi-folder-x fs-1 d-block mb-2 text-warning"></i>
+            <h5>No se encontraron documentos en MongoDB.</h5>
+            <p class="small text-muted">Agrega un nuevo producto desde la vista de MySQL o haz clic en "Sincronizar Todo".</p>
+            <a href="/productos" class="btn btn-primary btn-sm"><i class="bi bi-arrow-left"></i> Ir a MySQL</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+</div>
+
+<!-- Bootstrap Bundle con Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
