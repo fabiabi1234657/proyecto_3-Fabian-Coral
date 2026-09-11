@@ -11,13 +11,13 @@
       .img-container {
         height: 220px;
         width: 100%;
-        background-color: #ffffff;
+        background-color: #f8f9fa;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
         border-bottom: 1px solid #f0f0f0;
-        padding: 12px;
+        padding: 8px;
       }
       .product-img {
         max-height: 100%;
@@ -28,7 +28,7 @@
         transition: transform 0.3s ease;
       }
       .card:hover .product-img {
-        transform: scale(1.08);
+        transform: scale(1.05);
       }
     </style>
 </head>
@@ -56,9 +56,15 @@
           </a>
         </li>
       </ul>
-      <a href="/sincronizar" class="btn btn-outline-info btn-sm">
-        <i class="bi bi-arrow-repeat"></i> Sincronizar Todo
-      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="/sincronizar" class="btn btn-outline-info btn-sm">
+          <i class="bi bi-arrow-repeat"></i> Sincronizar
+        </a>
+        <span class="text-light small"><i class="bi bi-person-circle"></i> {{ usuario_actual or 'admin' }}</span>
+        <a href="/logout" class="btn btn-outline-danger btn-sm" title="Cerrar Sesión">
+          <i class="bi bi-box-arrow-right"></i> Salir
+        </a>
+      </div>
     </div>
   </div>
 </nav>
@@ -71,7 +77,7 @@
         <div class="row align-items-center g-3">
           <div class="col-md-6">
             <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-leaf-fill text-success"></i> Colección MongoDB (`mercancia.producto`)</h3>
-            <p class="text-muted mb-0 small">Búsqueda directa sobre los documentos almacenados en MongoDB.</p>
+            <p class="text-muted mb-0 small">Búsqueda sobre documentos con metadatos de almacenamiento híbrido.</p>
           </div>
           <div class="col-md-6">
             <form action="/mongo" method="GET" class="d-flex">
@@ -92,7 +98,11 @@
       <div class="col">
         <div class="card h-100 shadow-sm border-0 overflow-hidden">
           <div class="img-container">
-            <img src="{{ i.url or 'https://via.placeholder.com/300x200?text=Sin+Imagen' }}" class="product-img" alt="{{ i.producto }}" onerror="this.src='https://via.placeholder.com/300x200?text=Imagen+No+Disponible'">
+            {% if i.idproducto %}
+              <img src="/imagen/{{ i.idproducto }}/preview" class="product-img" alt="{{ i.producto }}" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=Sin+Imagen';">
+            {% else %}
+              <img src="{{ i.url or 'https://via.placeholder.com/300x200?text=Sin+Imagen' }}" class="product-img" alt="{{ i.producto }}" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=Sin+Imagen';">
+            {% endif %}
           </div>
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -112,11 +122,35 @@
             {% endif %}
 
             <p class="card-text text-secondary small">{{ i.descripcion or 'Sin descripción disponible.' }}</p>
+            
+            <!-- Badges informativos de almacenamiento -->
+            <div class="mt-2 pt-2 border-top">
+              {% if i.almacenamiento == 'mysql' %}
+                <span class="badge bg-info text-dark me-1"><i class="bi bi-database"></i> MySQL (&le; 1 MB)</span>
+              {% elif i.almacenamiento == 'filesystem' %}
+                <span class="badge bg-warning text-dark me-1"><i class="bi bi-shield-lock-fill"></i> Cifrada AES-256</span>
+                {% if i.tamano_comprimido %}
+                  <span class="badge bg-success me-1"><i class="bi bi-file-earmark-zip"></i> Previsualización Optimizada</span>
+                {% endif %}
+              {% endif %}
+
+              {% if i.tamano_real %}
+                <span class="badge bg-light text-dark border">
+                  {{ (i.tamano_real / 1048576)|round(2) }} MB
+                </span>
+              {% endif %}
+            </div>
           </div>
           <div class="card-footer bg-white border-top-0 pt-0 pb-3">
-            <small class="text-muted d-block text-truncate">
-              <i class="bi bi-link-45deg"></i> <a href="{{ i.url }}" target="_blank" class="text-decoration-none text-muted">{{ i.url }}</a>
-            </small>
+            {% if i.idproducto %}
+              <a href="/imagen/{{ i.idproducto }}" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-box-arrow-up-right"></i> Ver Imagen Original
+              </a>
+            {% elif i.url %}
+              <small class="text-muted d-block text-truncate">
+                <i class="bi bi-link-45deg"></i> <a href="{{ i.url }}" target="_blank" class="text-decoration-none text-muted">{{ i.url }}</a>
+              </small>
+            {% endif %}
           </div>
         </div>
       </div>

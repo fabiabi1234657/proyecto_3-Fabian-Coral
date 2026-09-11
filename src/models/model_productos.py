@@ -7,7 +7,8 @@ class Producto:
     def leer_productos():
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM producto ORDER BY idproducto DESC")
+            # Seleccionamos campos estándar y un indicador de si tiene blob para optimizar rendimiento
+            cursor.execute("SELECT idproducto, producto, marca, precio, imagen_mime, (imagen IS NOT NULL) AS tiene_blob FROM producto ORDER BY idproducto DESC")
             datos = cursor.fetchall()
         return datos
 
@@ -22,19 +23,24 @@ class Producto:
     def buscar_productos(termino):
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
-            query = "SELECT * FROM producto WHERE producto LIKE %s OR marca LIKE %s OR idproducto = %s ORDER BY idproducto DESC"
+            query = """
+                SELECT idproducto, producto, marca, precio, imagen_mime, (imagen IS NOT NULL) AS tiene_blob 
+                FROM producto 
+                WHERE producto LIKE %s OR marca LIKE %s OR idproducto = %s 
+                ORDER BY idproducto DESC
+            """
             val = f"%{termino}%"
             id_val = int(termino) if str(termino).isdigit() else -1
             cursor.execute(query, (val, val, id_val))
             return cursor.fetchall()
 
     @staticmethod
-    def crear_producto(producto, marca, precio, descripcion="", url=""):
+    def crear_producto(producto, marca, precio, descripcion="", url="", imagen_bytes=None, imagen_mime=None, mongo_meta=None):
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO producto (producto, marca, precio) VALUES (%s, %s, %s)",
-                (producto, marca, precio)
+                "INSERT INTO producto (producto, marca, precio, imagen, imagen_mime) VALUES (%s, %s, %s, %s, %s)",
+                (producto, marca, precio, imagen_bytes, imagen_mime)
             )
             id_generado = cursor.lastrowid
 
@@ -46,7 +52,8 @@ class Producto:
                 marca=marca,
                 precio=precio,
                 descripcion=descripcion,
-                url=url
+                url=url,
+                meta_imagen=mongo_meta
             )
         except Exception as e:
             print(f"Error sincronizando con MongoDB en creación: {e}")
@@ -54,13 +61,19 @@ class Producto:
         return id_generado
 
     @staticmethod
-    def actualizar_producto(idproducto, producto, marca, precio, descripcion="", url=""):
+    def actualizar_producto(idproducto, producto, marca, precio, descripcion="", url="", imagen_bytes=None, imagen_mime=None, mongo_meta=None, actualizar_imagen=False):
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE producto SET producto = %s, marca = %s, precio = %s WHERE idproducto = %s",
-                (producto, marca, precio, idproducto)
-            )
+            if actualizar_imagen:
+                cursor.execute(
+                    "UPDATE producto SET producto = %s, marca = %s, precio = %s, imagen = %s, imagen_mime = %s WHERE idproducto = %s",
+                    (producto, marca, precio, imagen_bytes, imagen_mime, idproducto)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE producto SET producto = %s, marca = %s, precio = %s WHERE idproducto = %s",
+                    (producto, marca, precio, idproducto)
+                )
 
         # Sincronización automática con MongoDB
         try:
@@ -70,7 +83,8 @@ class Producto:
                 marca=marca,
                 precio=precio,
                 descripcion=descripcion,
-                url=url
+                url=url,
+                meta_imagen=mongo_meta if actualizar_imagen else None
             )
         except Exception as e:
             print(f"Error sincronizando con MongoDB en actualización: {e}")
@@ -79,16 +93,13 @@ class Producto:
 
     @staticmethod
     def eliminar_producto(idproducto):
-        prod = Producto.obtener_producto_por_id(idproducto)
-        nombre_prod = prod['producto'] if prod else None
-
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
             cursor.execute("DELETE FROM producto WHERE idproducto = %s", (idproducto,))
 
-        # Sincronización automática con MongoDB
+        # Sincronización automática con MongoDB y limpieza de storage
         try:
-            ImagenProducto.eliminar_de_mongo(idproducto=idproducto, producto=nombre_prod)
+            ImagenProducto.eliminar_de_mongo(idproducto=idproducto)
         except Exception as e:
             print(f"Error eliminando de MongoDB: {e}")
 
@@ -108,4 +119,3 @@ class Producto:
             )
             sincronizados += 1
         return sincronizados
-

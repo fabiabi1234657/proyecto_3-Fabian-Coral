@@ -1,7 +1,9 @@
 from src.config.mongo_connection import get_mongo_connection
+from src.services.image_service import ImageService
 import re
 
 class ImagenProducto:
+
     @staticmethod
     def leer_imagenes():
         db = get_mongo_connection()
@@ -9,6 +11,14 @@ class ImagenProducto:
         for doc in imagenes:
             doc['_id'] = str(doc['_id'])
         return imagenes
+
+    @staticmethod
+    def obtener_por_idproducto(idproducto):
+        db = get_mongo_connection()
+        doc = db.producto.find_one({"idproducto": int(idproducto)})
+        if doc:
+            doc['_id'] = str(doc['_id'])
+        return doc
 
     @staticmethod
     def buscar_en_mongo(termino):
@@ -32,7 +42,7 @@ class ImagenProducto:
         return imagenes
 
     @staticmethod
-    def guardar_o_actualizar(idproducto, producto, marca=None, precio=None, descripcion="", url=""):
+    def guardar_o_actualizar(idproducto, producto, marca=None, precio=None, descripcion="", url="", meta_imagen=None):
         db = get_mongo_connection()
         filtro = {}
         if idproducto is not None:
@@ -42,10 +52,14 @@ class ImagenProducto:
 
         existente = db.producto.find_one(filtro)
         
+        # Si se envía una nueva imagen y existían archivos en disco previos, eliminarlos
+        if meta_imagen and existente:
+            ImageService.eliminar_archivos_mongo(existente)
+
         datos_actualizar = {
             "producto": producto,
             "descripcion": descripcion if descripcion else (existente.get("descripcion") if existente and existente.get("descripcion") else f"Descripción de {producto}"),
-            "url": url if url else (existente.get("url") if existente and existente.get("url") else "https://via.placeholder.com/300x200?text=" + str(producto))
+            "url": url if url else (existente.get("url") if existente and existente.get("url") else "")
         }
         if marca is not None:
             datos_actualizar["marca"] = marca
@@ -53,6 +67,17 @@ class ImagenProducto:
             datos_actualizar["precio"] = float(precio)
         if idproducto is not None:
             datos_actualizar["idproducto"] = int(idproducto)
+
+        # Asignar campos según las especificaciones exactas
+        if meta_imagen:
+            datos_actualizar["ruta"] = meta_imagen.get("ruta")
+            datos_actualizar["tamano_real"] = meta_imagen.get("tamano_real")
+            datos_actualizar["tamano_comprimido"] = meta_imagen.get("tamano_comprimido")
+            datos_actualizar["mime_type"] = meta_imagen.get("mime_type")
+            datos_actualizar["almacenamiento"] = meta_imagen.get("almacenamiento")
+            datos_actualizar["cifrada"] = meta_imagen.get("cifrada", False)
+            if "ruta_comprimida" in meta_imagen:
+                datos_actualizar["ruta_comprimida"] = meta_imagen["ruta_comprimida"]
 
         if existente:
             db.producto.update_one({"_id": existente["_id"]}, {"$set": datos_actualizar})
@@ -73,5 +98,9 @@ class ImagenProducto:
             filtro = {"producto": re.compile(f"^{re.escape(str(producto))}$", re.IGNORECASE)}
         
         if filtro:
+            # Recuperar documentos para eliminar sus archivos en disco
+            docs = list(db.producto.find(filtro))
+            for d in docs:
+                ImageService.eliminar_archivos_mongo(d)
             return db.producto.delete_many(filtro).deleted_count
-        return 0
+        return 0
