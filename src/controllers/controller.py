@@ -1,13 +1,30 @@
 import io
 import os
 import uuid
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, abort, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, send_file, abort, session, Response
 from src.models.model_productos import Producto
 from src.models.models_imagenes import ImagenProducto
-from src.services.image_storage_service import ImageStorageService, ImageValidationError
+from src.services.image_storage_service import ImageStorageService, ImageValidationError, BASE_DIR
 from src.services.auth_service import AuthService, login_required
 
 productos_c = Blueprint('productos_c', __name__, template_folder='../templates')
+
+DEFAULT_PLACEHOLDER_SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">'
+    b'<rect width="200" height="200" fill="#f8fafc"/>'
+    b'<rect x="40" y="40" width="120" height="120" rx="12" fill="#e2e8f0"/>'
+    b'<circle cx="75" cy="75" r="14" fill="#94a3b8"/>'
+    b'<path d="M55 140l30-35 25 22 25-30 30 43z" fill="#94a3b8"/>'
+    b'<text x="100" y="180" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#64748b" text-anchor="middle">Sin Foto</text>'
+    b'</svg>'
+)
+
+def _responder_placeholder():
+    """Genera una respuesta SVG limpia para productos existentes sin imagen."""
+    response = Response(DEFAULT_PLACEHOLDER_SVG, mimetype='image/svg+xml')
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 # =========================================================================
 # RUTAS DE AUTENTICACIÓN
@@ -205,19 +222,23 @@ def servir_imagen(idproducto):
             as_attachment=False,
             download_name=nombre_anonimo
         )
-        # Cabeceras de seguridad estrictas anti-filtración y anti-caché
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
     except FileNotFoundError:
-        if doc_mongo and doc_mongo.get('url') and doc_mongo.get('url').startswith('http'):
-            return redirect(doc_mongo['url'])
-        abort(404, description="Imagen no encontrada.")
+        if doc_mongo and doc_mongo.get('url'):
+            url_val = doc_mongo['url'].strip()
+            if url_val.startswith('http'):
+                return redirect(url_val)
+            elif url_val.startswith('/static/'):
+                ruta_local = os.path.join(BASE_DIR, 'src', url_val.lstrip('/'))
+                if os.path.exists(ruta_local):
+                    return send_file(ruta_local)
+        return _responder_placeholder()
     except Exception:
-        # Devuelve 500 genérico sin exponer rutas internas ni detalles de excepción
-        abort(500, description="Error al recuperar la imagen protegida.")
+        return _responder_placeholder()
 
 @productos_c.route('/imagen/<int:idproducto>/preview')
 @login_required
@@ -250,11 +271,17 @@ def servir_imagen_preview(idproducto):
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
     except FileNotFoundError:
-        if doc_mongo and doc_mongo.get('url') and doc_mongo.get('url').startswith('http'):
-            return redirect(doc_mongo['url'])
-        abort(404, description="Previsualización no disponible.")
+        if doc_mongo and doc_mongo.get('url'):
+            url_val = doc_mongo['url'].strip()
+            if url_val.startswith('http'):
+                return redirect(url_val)
+            elif url_val.startswith('/static/'):
+                ruta_local = os.path.join(BASE_DIR, 'src', url_val.lstrip('/'))
+                if os.path.exists(ruta_local):
+                    return send_file(ruta_local)
+        return _responder_placeholder()
     except Exception:
-        abort(500, description="Error al recuperar la previsualización.")
+        return _responder_placeholder()
 
 @productos_c.route('/imagenes')
 @productos_c.route('/mongo')

@@ -7,7 +7,6 @@ class Producto:
     def leer_productos():
         connection = get_mysql_connection()
         with connection.cursor() as cursor:
-            # Seleccionamos campos estándar y un indicador de si tiene blob para optimizar rendimiento
             cursor.execute("SELECT idproducto, producto, marca, precio, imagen_mime, (imagen IS NOT NULL) AS tiene_blob FROM producto ORDER BY idproducto DESC")
             datos = cursor.fetchall()
         return datos
@@ -107,15 +106,30 @@ class Producto:
 
     @staticmethod
     def sincronizar_todo():
-        """Sincroniza todos los productos de MySQL hacia MongoDB."""
-        productos_mysql = Producto.leer_productos()
+        """Sincroniza todos los productos de MySQL hacia MongoDB manteniendo metadatos e imágenes."""
+        connection = get_mysql_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT idproducto, producto, marca, precio, imagen, imagen_mime FROM producto ORDER BY idproducto DESC")
+            productos_mysql = cursor.fetchall()
+
         sincronizados = 0
         for p in productos_mysql:
+            meta = None
+            if p.get('imagen'):
+                meta = {
+                    "almacenamiento": "mysql",
+                    "mime_type": p.get('imagen_mime') or 'image/jpeg',
+                    "ruta": None,
+                    "tamano_real": len(p['imagen']),
+                    "tamano_comprimido": None,
+                    "cifrada": False
+                }
             ImagenProducto.guardar_o_actualizar(
                 idproducto=p['idproducto'],
                 producto=p['producto'],
                 marca=p['marca'],
-                precio=p['precio']
+                precio=p['precio'],
+                meta_imagen=meta
             )
             sincronizados += 1
         return sincronizados
