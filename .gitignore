@@ -1,0 +1,28 @@
+# Python y entornos virtuales
+env/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Variables de entorno y secretos
+.env
+.env.local
+.env.*.local
+
+# Almacenamiento seguro de imágenes cifradas (no trackear binarios/datos subidos)
+storage/images/*.enc
+storage/imagesCompresed/*.enc
+storage/images/*
+storage/imagesCompresed/*
+!storage/images/.gitkeep
+!storage/imagesCompresed/.gitkeep
+
+# Logs y bases de datos temporales
+*.log
+*.sqlite3
+.pytest_cache/
+.coverage
+htmlcov/
